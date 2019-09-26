@@ -1,0 +1,57 @@
+
+modelInfo=list(label = "eps-SVR with Radial Basis Function Kernel",
+                  library = "e1071",
+                  type = c("Regression"),
+                  parameters = data.frame(parameter = c("cost", "gamma"),
+                                          class = c("numeric", "numeric"),
+                                          label = c("Cost", "Gamma")),
+                  loop = NULL,
+                  grid=NULL,
+                  fit = function(x, y, wts, param, lev, last, classProbs, ...) { 
+                    if(any(names(list(...)) == "prob.model") | is.numeric(y)) {
+                      out=svm(x = as.matrix(x), y = y,
+                                 scale=TRUE,
+                                 type='eps-regression',
+                                 kernel = 'radial',
+                                 gamma = param$gamma,
+                                 cost = param$cost, ...)
+                    }
+                    out            
+                  },
+                  predict = function(modelFit, newdata, submodels = NULL) {
+                    predict(modelFit, newdata=newdata)
+                  },
+                  prob = function(modelFit, newdata, submodels = NULL) {
+                    FALSE
+                  },
+                  predictors = function(x, ...){
+                    FALSE
+                  },
+                  tags = c("Kernel Method", "Support Vector Machines", "Radial Basis Function",
+                           "Robust Methods"),
+                  levels = function(x) lev(x),
+                  sort = function(x) {
+                    # If the cost is high, the decision boundary will work hard to
+                    # adapt. Also, if C is fixed, smaller values of sigma yeild more
+                    # complex boundaries
+                    x[order(x$cost, -x$gamma),]
+                  })
+
+n_fold=3
+folds=cut(seq(1,dim(dat)[1]),breaks=n_fold,labels=FALSE)
+folds_list=list()
+for(i in 1:n_fold){
+  folds_list[[i]]=which(folds==i)
+}
+epsSVRGrid=expand.grid(
+  gamma = 2^c(0:1),
+  cost = 2^c(2:3)
+)
+
+library(doParallel)
+registerDoParallel(cores=8)
+set.seed(1)
+cv_mod=train(Sepal.Length~., dat, method=modelInfo,
+                 trControl= trainControl(method='cv', number = n_fold, index = folds_list, allowParallel=T),
+                 tuneGrid = epsSVRGrid, metric='RMSE')
+
